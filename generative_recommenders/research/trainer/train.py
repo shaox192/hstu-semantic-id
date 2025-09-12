@@ -461,7 +461,7 @@ def train_fn(
             if (batch_id % eval_interval) == 0:
                 log_msg = f" rank: {rank}, batch-stat (train): step {batch_id} "\
                           f"(epoch {epoch} in {time.time() - last_training_time:.2f}s): {loss:.6f} "
-                if SID_emb_comb_method == "scalarWeight":
+                if ("indEmb" in SID_emb_method) and (SID_emb_comb_method == "scalarWeight"):
                     log_msg += f"weight alpha: {model.module._embedding_module.weight_alpha.item():.6f}"
 
                 logging.info(log_msg)

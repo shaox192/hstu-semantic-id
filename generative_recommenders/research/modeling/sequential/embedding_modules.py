@@ -222,7 +222,7 @@ class LocalSIDEmbeddingModule(EmbeddingModule):
         if self._emb_method in ["prefixN-indEmb", "RQsum-indEmb"]:
             out_str += f"-indEmb_{self._emb_comb_method_name_str}"
         else:
-            out_str += f"-IndEmb_NONE"
+            out_str += f"-indEmb_NONE"
             
         return out_str
 
