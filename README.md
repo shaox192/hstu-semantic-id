@@ -109,10 +109,12 @@ We conducted experiments on the [MovieLens](https://grouplens.org/datasets/movie
 
 *Example*: default parameters on movielens-1m
 ```bash
+DSET="ml-1m" &&
+mkdir -p logs/${DSET}-l200 &&
 CUDA_VISIBLE_DEVICES=0 python3 main.py \
-    --gin_config_file=configs/ml-1m/hstu-sampled-softmax-n128-final.gin \
+    --gin_config_file=configs/${DSET}/hstu-sampled-softmax-n128-final.gin \
     --master_port=12345 \
-    2>&1 | tee logs/ml-1m-l200/hstu-sampled-softmax-n128-final-BL.log
+    2>&1 | tee logs/${DSET}-l200/hstu-sampled-softmax-n128-final-BL.log
 ```
 
 #### HSTU with SID
@@ -120,11 +122,12 @@ CUDA_VISIBLE_DEVICES=0 python3 main.py \
 
 *Example*: train HSTU on movielens-1m with 2-layer SID, embedding created with `prefixN` method, combined with the original item ID embedding with the basic `sum` fusion method.
 ```bash
-mkdir -p logs/ml-1m-l200 && \
+DSET="ml-1m" &&
+mkdir -p logs/${DSET}-l200 &&
 CUDA_VISIBLE_DEVICES=0 python3 main.py \
-    --gin_config_file=configs/ml-1m/hstu-sampled-softmax-n128-final-SID.gin \
+    --gin_config_file=configs/${DSET}/hstu-sampled-softmax-n128-final-SID.gin \
     --master_port=12345 \
-    2>&1 | tee logs/ml-1m-l200/hstu-sampled-softmax-n128-final-SID.log
+    2>&1 | tee logs/${DSET}-l200/hstu-sampled-softmax-n128-final-SID.log
 
 ```
 For training with movielens-20m with 3 layers of SID (because 2 layers are not enough to cover ~28k items), run this config file: `configs/ml-20m/hstu-sampled-softmax-n128-final-SID.gin`.

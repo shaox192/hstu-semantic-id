@@ -156,6 +156,7 @@ class LocalSIDEmbeddingModule(EmbeddingModule):
         if emb_method in ["prefixN-indEmb", "RQsum-indEmb"]:
             # keeping the individual item embeddings as well
             self._item_emb_individual: torch.nn.Embedding = torch.nn.Embedding(num_items + 1, item_embedding_dim, padding_idx=0)
+            self._emb_comb_method_name_str = emb_comb_method
             self._emb_comb_method: function = self._init_emb_comb_method(emb_comb_method) # how to combine semantic embeddings and individual embeddings
 
         self.reset_params()
@@ -216,7 +217,14 @@ class LocalSIDEmbeddingModule(EmbeddingModule):
         return combiner
             
     def debug_str(self) -> str:
-        return f"local_SID_emb_d{self._item_embedding_dim}"
+        out_str = f"local_SID_emb_d{self._item_embedding_dim}_m{self._emb_method}_tbl{self._emb_tbl_size}_l{self._num_layers}_c{self._num_codes}"
+
+        if self._emb_method in ["prefixN-indEmb", "RQsum-indEmb"]:
+            out_str += f"-indEmb_{self._emb_comb_method_name_str}"
+        else:
+            out_str += f"-IndEmb_NONE"
+            
+        return out_str
 
     def reset_params(self):
         for name, params in self.named_parameters():

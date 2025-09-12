@@ -660,7 +660,8 @@ class HSTU(SequentialEncoderWithLearnedSimilarityModule):
 
     def debug_str(self) -> str:
         debug_str = (
-            f"HSTU-b{self._num_blocks}-h{self._num_heads}-dqk{self._dqk}-dv{self._dv}"
+            f"HSTU-embmodule_{self._embedding_module.debug_str()}"
+            + f"-b{self._num_blocks}-h{self._num_heads}-dqk{self._dqk}-dv{self._dv}"
             + f"-l{self._linear_activation}d{self._linear_dropout_rate}"
             + f"-ad{self._attn_dropout_rate}"
         )

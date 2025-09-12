@@ -194,7 +194,7 @@ def train_fn(
         drop_last=world_size > 1,
     )
 
-    model_debug_str = main_module
+    # model_debug_str = main_module
     if embedding_module_type == "local":
         embedding_module: EmbeddingModule = LocalEmbeddingModule(
             num_items=dataset.max_item_id,
@@ -216,7 +216,7 @@ def train_fn(
         )
     else:
         raise ValueError(f"Unknown embedding_module_type {embedding_module_type}")
-    model_debug_str += f"-{embedding_module.debug_str()}"
+    # model_debug_str += f"-{embedding_module.debug_str()}"
 
     interaction_module, interaction_module_debug_str = get_similarity_function(
         module_type=interaction_module_type,
