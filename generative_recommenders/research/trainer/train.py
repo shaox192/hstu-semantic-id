@@ -141,7 +141,7 @@ def train_fn(
     enable_tf32: bool = False,
     random_seed: int = 42,
     # ============= SID parameters
-    use_SID = True,
+    use_SID = False,
     SID_emb_method = "prefixN",
     SID_emb_tbl_size = 1300,
     SID_data_pth_sfx = "L2_C128",

@@ -149,7 +149,7 @@ There are several parameters that can be tuned to look at the effect of differen
 
 ## Results & Analysis
 
-Full results, analysis and discussion live in 👉 [my blog]().
+Full results, analysis and discussion live in 👉 [my blog](https://shaox192.github.io/posts/2025/09/08/hstu-sid/).
 
 
 ## 🎬 Extended MovieLens Collection
