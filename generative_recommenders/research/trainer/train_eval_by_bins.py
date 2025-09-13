@@ -374,9 +374,9 @@ def train_fn(
     if positional_sampling_ratio is not None and positional_sampling_ratio < 1:
         model_desc += f"-d{positional_sampling_ratio}"
     # creates subfolders.
-    os.makedirs(f"./exps/{model_subfolder}", exist_ok=True)
-    os.makedirs(f"./ckpts/{model_subfolder}", exist_ok=True)
-    log_dir = f"./exps/{model_desc}"
+    os.makedirs(f"./exps_anal_binnedeval/{model_subfolder}", exist_ok=True)
+    os.makedirs(f"./ckpts_anal_binnedeval/{model_subfolder}", exist_ok=True)
+    log_dir = f"./exps_anal_binnedeval/{model_desc}"
     if rank == 0:
         writer = SummaryWriter(log_dir=log_dir)
         logging.info(f"Rank {rank}: writing logs to {log_dir}")
@@ -640,14 +640,14 @@ def train_fn(
                 )
 
         if rank == 0 and epoch > 0 and (epoch % save_ckpt_every_n) == 0:
-            logging.info(f"rank {rank}: saving checkpoint at epoch {epoch} to [./ckpts/{model_desc}_ep{epoch}]...")
+            logging.info(f"rank {rank}: saving checkpoint at epoch {epoch} to [./ckpts_anal_binnedeval/{model_desc}_ep{epoch}]...")
             torch.save(
                 {
                     "epoch": epoch,
                     "model_state_dict": model.state_dict(),
                     "optimizer_state_dict": opt.state_dict(),
                 },
-                f"./ckpts/{model_desc}_ep{epoch}",
+                f"./ckpts_anal_binnedeval/{model_desc}_ep{epoch}",
             )
 
         last_training_time = time.time()
@@ -656,14 +656,14 @@ def train_fn(
         if writer is not None:
             writer.flush()
             writer.close()
-        logging.info(f"rank {rank}: saving final checkpoint at epoch {epoch} to [./ckpts/{model_desc}_ep{epoch}]...")
+        logging.info(f"rank {rank}: saving final checkpoint at epoch {epoch} to [./ckpts_anal_binnedeval/{model_desc}_ep{epoch}]...")
         torch.save(
             {
                 "epoch": epoch,
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": opt.state_dict(),
             },
-            f"./ckpts/{model_desc}_ep{epoch}",
+            f"./ckpts_anal_binnedeval/{model_desc}_ep{epoch}",
         )
 
     cleanup()
