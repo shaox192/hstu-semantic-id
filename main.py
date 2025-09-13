@@ -33,7 +33,7 @@ import torch
 import torch.multiprocessing as mp
 
 from absl import app, flags
-from generative_recommenders.research.trainer.train import train_fn
+# from generative_recommenders.research.trainer.train import train_fn
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
@@ -48,6 +48,7 @@ def delete_flags(FLAGS, keys_to_delete: List[str]) -> None:  # pyre-ignore [2]
 delete_flags(flags.FLAGS, ["gin_config_file", "master_port"])
 flags.DEFINE_string("gin_config_file", None, "Path to the config file.")
 flags.DEFINE_integer("master_port", 12355, "Master port.")
+flags.DEFINE_boolean("binned_eval", False, "Whether to use binned evaluation.")
 FLAGS = flags.FLAGS  # pyre-ignore [5]
 
 
@@ -56,13 +57,19 @@ def mp_train_fn(
     world_size: int,
     master_port: int,
     gin_config_file: Optional[str],
+    use_binned_eval: bool = False,
 ) -> None:
+    if use_binned_eval:
+        from generative_recommenders.research.trainer import train_eval_by_bins as trainer
+    else:
+        from generative_recommenders.research.trainer import train as trainer
+
     if gin_config_file is not None:
         # Hack as absl doesn't support flag parsing inside multiprocessing.
         logging.info(f"Rank {rank}: loading gin config from {gin_config_file}")
         gin.parse_config_file(gin_config_file)
 
-    train_fn(rank, world_size, master_port)
+    trainer.train_fn(rank, world_size, master_port)
 
 
 def _main(argv) -> None:  # pyre-ignore [2]
@@ -71,7 +78,7 @@ def _main(argv) -> None:  # pyre-ignore [2]
     mp.set_start_method("forkserver")
     mp.spawn(
         mp_train_fn,
-        args=(world_size, FLAGS.master_port, FLAGS.gin_config_file),
+        args=(world_size, FLAGS.master_port, FLAGS.gin_config_file, FLAGS.binned_eval),
         nprocs=world_size,
         join=True,
     )

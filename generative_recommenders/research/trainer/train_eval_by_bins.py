@@ -61,6 +61,7 @@ from generative_recommenders.research.modeling.sequential.encoder_utils import (
 )
 from generative_recommenders.research.modeling.sequential.features import (
     movielens_seq_features_from_row,
+    SequentialFeatures
 )
 from generative_recommenders.research.modeling.sequential.input_features_preprocessors import (
     LearnablePositionalEmbeddingInputFeaturesPreprocessor,
@@ -90,6 +91,24 @@ def setup(rank: int, world_size: int, master_port: int) -> None:
 
 def cleanup() -> None:
     dist.destroy_process_group()
+
+
+def slice_seq_features(full_seq_feats, indices_mask) -> SequentialFeatures:
+    indices_mask = indices_mask.squeeze()
+    sliced_seq_feats = SequentialFeatures(
+        # (B,) x int64. Requires past_lengths[i] > 0 \forall i.
+        past_lengths = full_seq_feats.past_lengths[indices_mask],
+        # (B, N,) x int64. 0 denotes valid ids.
+        past_ids = full_seq_feats.past_ids[indices_mask],
+        # (B, N, D) x float.
+        past_embeddings = None if full_seq_feats.past_embeddings is None else full_seq_feats.past_embeddings[indices_mask],
+        # Implementation-specific payloads.
+        # e.g., past timestamps, past event_types (e.g., clicks, likes), etc.
+        past_payloads = {k: v[indices_mask] for k, v in full_seq_feats.past_payloads.items()} \
+            if full_seq_feats.past_payloads is not None else None
+
+    )
+    return sliced_seq_feats
 
 
 @gin.configurable
@@ -153,7 +172,7 @@ def train_fn(
     SID_use_num_codebook_layers = 3,
     SID_scale_SID_emb = False,
     # ============== binning file
-    binning_file: str = "./analysis/movie_binning_ml-1m.pkl",
+    binning_file: str = "",
 ) -> None:
     # to enable more deterministic results.
     random.seed(random_seed)
@@ -184,8 +203,8 @@ def train_fn(
     logging.info(f"Loaded movie binning from {binning_file}. " \
                  f"Found {num_bins} bins. \n" \
                  f"Number of items in each bin: {num_items_in_bins}")
-    
-    easy_index_bins = torch.zeros(len(movie_binning) + 1, dtype= torch.int)
+
+    easy_index_bins = torch.zeros(np.max(mov_id_arr) + 1, dtype= torch.int32)
     for i in range(num_bins):
         easy_index_bins[mov_id_arr[bin_id_arr == i]] = i
     # this will be a lookup table: use movie id to index to get the bin id.
@@ -402,12 +421,20 @@ def train_fn(
 
                 # loop through the bins
                 for bi in range(num_bins):
-                    curr_target_ids = target_ids[easy_index_bins[target_ids] == bi]  # map to bin ids
-                    curr_seq_features = seq_features[easy_index_bins[seq_features] == bi]
-                    curr_target_ratings = target_ratings[easy_index_bins[target_ratings] == bi]
+                    bin_mask = easy_index_bins[target_ids] == bi
+                    bin_mask = bin_mask.squeeze()
+                    
+                    curr_target_ids = target_ids[bin_mask]  # map to bin ids
+                    curr_target_ratings = target_ratings[bin_mask]
+                    curr_seq_features = slice_seq_features(seq_features, bin_mask)
+
                     if curr_target_ids.shape[0] == 0:
                         #TODO: dummy values
                         eval_dict = {}
+                        logging.info(
+                            f"rank {rank}:  batch-stat (eval): iter {batch_id} (epoch {epoch}): bin {bi} :"
+                            "no samples in this bin, skip"
+                        )
                     else:
                         eval_dict = eval_metrics_v2_from_tensors(
                             eval_state,
@@ -418,16 +445,18 @@ def train_fn(
                             user_max_batch_size=eval_user_max_batch_size,
                             dtype=torch.bfloat16 if main_module_bf16 else None,
                         )
+                        logging.info(
+                            f"rank {rank}:  batch-stat (eval): iter {batch_id} (epoch {epoch}): "
+                            f"(bin {bi}, samples {curr_target_ids.shape[0]}/{target_ids.shape[0]}) :"
+                            f"NDCG@10 {_avg(eval_dict['ndcg@10'], world_size):.4f}, "
+                            f"HR@10 {_avg(eval_dict['hr@10'], world_size):.4f}, "
+                            f"HR@50 {_avg(eval_dict['hr@50'], world_size):.4f}, "
+                            f"MRR {_avg(eval_dict['mrr'], world_size):.4f} "
+                        )
                     add_to_summary_writer(
                         writer, batch_id, eval_dict, prefix=f"eval-bin{bi}", world_size=world_size
                     )
-                    logging.info(
-                        f"rank {rank}:  batch-stat (eval): iter {batch_id} (epoch {epoch}): bin {bi} :"
-                        + f"NDCG@10 {_avg(eval_dict['ndcg@10'], world_size):.4f}, "
-                        f"HR@10 {_avg(eval_dict['hr@10'], world_size):.4f}, "
-                        f"HR@50 {_avg(eval_dict['hr@50'], world_size):.4f}, "
-                        + f"MRR {_avg(eval_dict['mrr'], world_size):.4f} "
-                    )
+
                 model.train()
 
             # TODO: consider separating this out?
@@ -537,18 +566,22 @@ def train_fn(
             )
 
             for bi in range(num_bins):
-                curr_target_ids = target_ids[easy_index_bins[target_ids] == bi]  # map to bin ids
-                curr_seq_features = seq_features[easy_index_bins[seq_features] == bi]
-                curr_target_ratings = target_ratings[easy_index_bins[target_ratings] == bi]
+                bin_mask = easy_index_bins[target_ids] == bi
+                bin_mask = bin_mask.squeeze()
+
+                curr_target_ids = target_ids[bin_mask]  # map to bin ids
+                curr_target_ratings = target_ratings[bin_mask]
+                curr_seq_features = slice_seq_features(seq_features, bin_mask)
+
                 if curr_target_ids.shape[0] == 0:
                     eval_dict = {}
                 else:
                     eval_dict = eval_metrics_v2_from_tensors(
                         eval_state,
                         model.module,
-                        seq_features,
-                        target_ids=target_ids,
-                        target_ratings=target_ratings,
+                        curr_seq_features,
+                        target_ids=curr_target_ids,
+                        target_ratings=curr_target_ratings,
                         user_max_batch_size=eval_user_max_batch_size,
                         dtype=torch.bfloat16 if main_module_bf16 else None,
                     )
@@ -569,15 +602,26 @@ def train_fn(
                 break
         
         for bi in range(num_bins):
-            assert eval_dict_all[bi] is not None
-            for k, v in eval_dict_all[bi].items():
-                eval_dict_all[bi][k] = torch.cat(v, dim=-1)
+            if len(eval_dict_all[bi]) == 0:
+                logging.info(
+                    f"rank {rank}: eval @ epoch {epoch}"
+                    f"(bin {bi}, samples 0/{len(eval_data_loader)}) : no samples in this bin, skip"
+                )
+            else:
+                for k, v in eval_dict_all[bi].items():
+                    eval_dict_all[bi][k] = torch.cat(v, dim=-1)
 
-            ndcg_10 = _avg(eval_dict_all[bi]["ndcg@10"], world_size=world_size)
-            ndcg_50 = _avg(eval_dict_all[bi]["ndcg@50"], world_size=world_size)
-            hr_10 = _avg(eval_dict_all[bi]["hr@10"], world_size=world_size)
-            hr_50 = _avg(eval_dict_all[bi]["hr@50"], world_size=world_size)
-            mrr = _avg(eval_dict_all[bi]["mrr"], world_size=world_size)
+                ndcg_10 = _avg(eval_dict_all[bi]["ndcg@10"], world_size=world_size)
+                ndcg_50 = _avg(eval_dict_all[bi]["ndcg@50"], world_size=world_size)
+                hr_10 = _avg(eval_dict_all[bi]["hr@10"], world_size=world_size)
+                hr_50 = _avg(eval_dict_all[bi]["hr@50"], world_size=world_size)
+                mrr = _avg(eval_dict_all[bi]["mrr"], world_size=world_size)
+                logging.info(
+                    f"rank {rank}: eval @ epoch {epoch}"
+                    f"(bin {bi}, samples {eval_dict_all[bi]['ndcg@10'].shape[0]}) : "
+                    f"in {time.time() - eval_start_time:.2f}s: "
+                    f"NDCG@10 {ndcg_10:.4f}, NDCG@50 {ndcg_50:.4f}, HR@10 {hr_10:.4f}, HR@50 {hr_50:.4f}, MRR {mrr:.4f}"
+                )
 
             add_to_summary_writer(
                 writer,
@@ -594,10 +638,6 @@ def train_fn(
                     prefix=f"eval_epoch_full_bin{bi}",
                     world_size=world_size,
                 )
-            logging.info(
-                f"rank {rank}: eval @ epoch {epoch} for bin {bi} : in {time.time() - eval_start_time:.2f}s: "
-                f"NDCG@10 {ndcg_10:.4f}, NDCG@50 {ndcg_50:.4f}, HR@10 {hr_10:.4f}, HR@50 {hr_50:.4f}, MRR {mrr:.4f}"
-            )
 
         if rank == 0 and epoch > 0 and (epoch % save_ckpt_every_n) == 0:
             logging.info(f"rank {rank}: saving checkpoint at epoch {epoch} to [./ckpts/{model_desc}_ep{epoch}]...")
