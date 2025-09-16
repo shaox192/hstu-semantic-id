@@ -1,4 +1,4 @@
-# Enriching Generative Recommendation with Semantic IDs
+# Enriching Recommendation Models with Semantic IDs
 
 ## Overview
 
@@ -6,7 +6,7 @@ This repository contains experiments extending the [HSTU](https://proceedings.ml
 
 HSTU represents a breakthrough as one of the first sequential generative recommendation models, achieving remarkable success in production systems. However, like many traditional recommendation models, it takes as input arbitrary item IDs in user history sequences. This raises the question of whether HSTU can further benefit from instilling semantic meaning into item IDs -- an idea recently gaining traction under the term Semantic IDs (e.g. Google's [TIGER](https://papers.neurips.cc/paper_files/paper/2023/file/20dcab0f14046a5c6b02b61da9f13229-Paper-Conference.pdf), Kuaishou's [OneRec](https://arxiv.org/abs/2502.18965)).
 
-**For the complete analysis and discussion of our findings, see our detailed blog post [here]().** #TODO
+** Full results, analysis and discussion live in 👉 [my blog](https://shaox192.github.io/posts/2025/09/08/hstu-sid/). **
 
 We conducted experiments on the [MovieLens](https://grouplens.org/datasets/movielens/) dataset (1M and 20M variants) to investigate this question. Notably, the original MovieLens dataset contains limited metadata (only title, year, and genre), making semantic embedding extraction challenging. We here extended the dataset with rich movie information including plot summaries, rich keywords, audience reviews etc from various sources. This enhanced metadata enables current LLMs to generate meaningful semantic embeddings for Semantic ID creation. These information can be embedded with modern LLMs and then quantized to produce SIDs. 
 
@@ -150,10 +150,6 @@ There are several parameters that can be tuned to look at the effect of differen
     - `scalarWeight`: learns alpha as a single parameter.
 
 
-## Results & Analysis
-
-Full results, analysis and discussion live in 👉 [my blog](https://shaox192.github.io/posts/2025/09/08/hstu-sid/).
-
 
 ## 🎬 Extended MovieLens Collection
 
@@ -260,7 +256,7 @@ If you find this work useful, please consider citing:
 
 ```bibtex
 @misc{shao2025_hstu_sid,
-  title  = {Enriching Generative Recommendation with Semantic IDs},
+  title  = {Enriching Recommender Models with Semantic IDs},
   author = {Zhenan Shao},
   year   = {2025},
   howpublished = {GitHub},
